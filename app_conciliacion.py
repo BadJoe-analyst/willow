@@ -5,7 +5,16 @@ from datetime import datetime
 st.set_page_config(page_title="Conciliación Diario Fudo & Klap", layout="centered")
 
 # === LOGO ===
-st.image("https://raw.githubusercontent.com/BadJoe-analyst/willow/main/logo.jpeg", width=200)
+st.markdown(
+    """
+    <div style="text-align: center;">
+        <img src="https://raw.githubusercontent.com/BadJoe-analyst/willow/main/logo.jpeg" width="200"/>
+        <h2 style="margin-top: 0;">Willow Café</h2>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
 
 st.title("📊 Conciliación de Ventas: Fudo vs Klap")
 
