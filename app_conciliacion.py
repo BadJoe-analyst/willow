@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+import chardet
 
 st.set_page_config(page_title="Conciliación Diario Fudo & Klap", layout="centered")
 
@@ -8,13 +9,12 @@ st.set_page_config(page_title="Conciliación Diario Fudo & Klap", layout="center
 st.markdown(
     """
     <div style="text-align: center;">
-        <img src="https://raw.githubusercontent.com/BadJoe-analyst/willow/main/logo.jpeg" width="200"/>
+        <img src="https://raw.githubusercontent.com/BadJoe-analyst/willow/main/logo.png" width="200"/>
         <h2 style="margin-top: 0;">Willow Café</h2>
     </div>
     """,
     unsafe_allow_html=True
 )
-
 
 st.title("📊 Conciliación de Ventas: Fudo vs Klap")
 
@@ -31,11 +31,19 @@ st.markdown("""
 # === CARGA DE ARCHIVOS ===
 subidos = st.file_uploader("📎 Sube dos archivos CSV (Fudo y Klap)", type=["csv"], accept_multiple_files=True)
 
+def detectar_encoding(file):
+    rawdata = file.read()
+    file.seek(0)
+    resultado = chardet.detect(rawdata)
+    return resultado['encoding']
+
 if subidos and len(subidos) == 2:
     try:
-        # Detectar cuál es Fudo por columnas típicas
-        df1 = pd.read_csv(subidos[0], sep=';', encoding='latin1', skiprows=3, on_bad_lines='skip')
-        df2 = pd.read_csv(subidos[1], sep=';', encoding='utf-8', on_bad_lines='skip')
+        encoding1 = detectar_encoding(subidos[0])
+        encoding2 = detectar_encoding(subidos[1])
+
+        df1 = pd.read_csv(subidos[0], sep=';', encoding=encoding1, skiprows=3, on_bad_lines='skip')
+        df2 = pd.read_csv(subidos[1], sep=';', encoding=encoding2, on_bad_lines='skip')
 
         if "Medio de Pago" in df1.columns:
             df_fudo, df_klap = df1, df2
