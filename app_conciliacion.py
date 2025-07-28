@@ -3,6 +3,10 @@ import pandas as pd
 from datetime import datetime
 
 st.set_page_config(page_title="Conciliación Diario Fudo & Klap", layout="centered")
+
+# === LOGO ===
+st.image("https://github.com/BadJoe-analyst/willow/blob/main/logo.jpeg", width=200)
+
 st.title("📊 Conciliación de Ventas: Fudo vs Klap")
 
 st.markdown("""
