@@ -20,16 +20,15 @@ st.title("📊 Conciliación de Ventas: Fudo vs Klap")
 
 st.markdown("""
 ### 📌 Instrucciones:
-1. Asegúrate de tener **dos archivos en formato CSV**:
-   - El primero debe ser exportado desde Fudo (omite las primeras 3 filas al guardar)
-   - El segundo debe ser exportado desde Klap
-2. No importa el nombre de los archivos, pero deben contener las columnas esperadas.
+1. Sube los archivos exportados de Fudo y Klap en formato CSV.
+2. El archivo de Fudo debe omitir manualmente las primeras 3 filas antes de exportar.
 3. Esta app detecta automáticamente la fecha contenida en el archivo de Fudo.
-4. Los archivos deben contener datos válidos del mismo día.
 """)
 
-# === CARGA DE ARCHIVOS ===
-subidos = st.file_uploader("📎 Sube dos archivos CSV (Fudo y Klap)", type=["csv"], accept_multiple_files=True)
+# === CARGA DE ARCHIVOS SEPARADOS ===
+st.subheader("⬆️ Subida de archivos")
+fudo_file = st.file_uploader("Archivo Fudo (.csv)", type=["csv"], key="fudo")
+klap_file = st.file_uploader("Archivo Klap (.csv)", type=["csv"], key="klap")
 
 def detectar_encoding(file):
     rawdata = file.read()
@@ -37,21 +36,13 @@ def detectar_encoding(file):
     resultado = chardet.detect(rawdata)
     return resultado['encoding']
 
-if subidos and len(subidos) == 2:
+if fudo_file and klap_file:
     try:
-        encoding1 = detectar_encoding(subidos[0])
-        encoding2 = detectar_encoding(subidos[1])
+        enc_fudo = detectar_encoding(fudo_file)
+        enc_klap = detectar_encoding(klap_file)
 
-        df1 = pd.read_csv(subidos[0], sep=';', encoding=encoding1, skiprows=3, on_bad_lines='skip')
-        df2 = pd.read_csv(subidos[1], sep=';', encoding=encoding2, on_bad_lines='skip')
-
-        if "Medio de Pago" in df1.columns:
-            df_fudo, df_klap = df1, df2
-        elif "Medio de Pago" in df2.columns:
-            df_fudo, df_klap = df2, df1
-        else:
-            st.error("❌ No se pudo identificar cuál archivo es Fudo. Asegúrate de subir un archivo válido exportado desde Fudo.")
-            st.stop()
+        df_fudo = pd.read_csv(fudo_file, sep=';', encoding=enc_fudo, skiprows=3, on_bad_lines='skip')
+        df_klap = pd.read_csv(klap_file, sep=';', encoding=enc_klap, on_bad_lines='skip')
 
         # Procesar fechas y montos
         df_fudo["Fecha"] = pd.to_datetime(df_fudo["Fecha"], dayfirst=True, errors='coerce')
