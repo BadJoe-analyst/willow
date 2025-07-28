@@ -21,7 +21,7 @@ st.title("📊 Conciliación de Ventas: Fudo vs Klap")
 st.markdown("""
 ### 📌 Instrucciones:
 1. Sube los archivos exportados de Fudo y Klap en formato CSV.
-2. El archivo de Fudo debe omitir manualmente las primeras 3 filas antes de exportar.
+2. Eres una washita rica.
 3. Esta app detecta automáticamente la fecha contenida en el archivo de Fudo.
 """)
 
