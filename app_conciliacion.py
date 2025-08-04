@@ -5,16 +5,13 @@ import chardet
 
 st.set_page_config(page_title="Conciliación Diario Fudo & Klap", layout="centered")
 
-# === LOGO + TITULO ===
-st.markdown(
-    """
-    <div style="text-align: center;">
-        <img src="https://raw.githubusercontent.com/BadJoe-analyst/willow/main/logo.jpeg" width="200"/>
-        <h2 style="margin-top: 0;">Willow Café</h2>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+# === LOGO Y TÍTULO ===
+st.markdown("""
+<div style="text-align: center;">
+    <img src="https://raw.githubusercontent.com/BadJoe-analyst/willow/main/logo.jpeg" width="200"/>
+    <h2 style="margin-top: 0;">Willow Café</h2>
+</div>
+""", unsafe_allow_html=True)
 
 st.title("📊 Conciliación de Ventas: Fudo vs Klap")
 
@@ -25,38 +22,49 @@ st.markdown("""
 3. Esta app detecta automáticamente la fecha contenida en el archivo de Fudo.
 """)
 
+# === SUBIDA DE ARCHIVOS ===
 st.subheader("⬆️ Subida de archivos")
 fudo_file = st.file_uploader("Archivo Fudo (.csv)", type=["csv"], key="fudo")
 klap_file = st.file_uploader("Archivo Klap (.csv)", type=["csv"], key="klap")
 
 def detectar_encoding(file):
-    rawdata = file.read()
+    raw = file.read()
     file.seek(0)
-    resultado = chardet.detect(rawdata)
-    return resultado['encoding']
+    return chardet.detect(raw)['encoding']
 
 if fudo_file and klap_file:
     try:
         enc_fudo = detectar_encoding(fudo_file)
         enc_klap = detectar_encoding(klap_file)
 
+        # === CARGAR FUDO ===
         try:
             df_fudo = pd.read_csv(fudo_file, sep=';', encoding=enc_fudo, skiprows=3, on_bad_lines='skip')
             if len(df_fudo.columns) == 1:
-                raise ValueError("Separador incorrecto detectado")
+                raise ValueError
         except:
             fudo_file.seek(0)
             df_fudo = pd.read_csv(fudo_file, sep=',', encoding=enc_fudo, skiprows=3, on_bad_lines='skip')
 
+        # === CARGAR KLAP ===
         df_klap = pd.read_csv(klap_file, sep=';', encoding=enc_klap, on_bad_lines='skip')
 
+        # === FILTRO APROBADOS EN KLAP ===
+        estado_aprobado = next((e for e in df_klap["Estado"].dropna().astype(str).str.lower().unique() if "aproba" in e), None)
+        df_klap = df_klap[df_klap["Estado"].str.lower() == estado_aprobado] if estado_aprobado else df_klap.iloc[0:0]
+
+        # === FECHAS Y MONTO ===
         df_fudo["Fecha"] = pd.to_datetime(df_fudo["Fecha"], dayfirst=True, errors='coerce')
-        df_fudo["Total"] = pd.to_numeric(df_fudo["Total"], errors='coerce').fillna(0)
         df_klap["Fecha"] = pd.to_datetime(df_klap["Fecha"], dayfirst=True, errors='coerce')
+        df_fudo["Total"] = pd.to_numeric(df_fudo["Total"], errors='coerce').fillna(0)
         df_klap["Monto"] = pd.to_numeric(df_klap["Monto"], errors='coerce').fillna(0)
 
+        # === FILTRO ESTADO CERRADA EN FUDO ===
+        if "Estado" in df_fudo.columns:
+            df_fudo = df_fudo[df_fudo["Estado"].str.lower().str.contains("cerrad")]
+
         if df_fudo["Fecha"].dropna().empty:
-            st.error("❌ No se detectó ninguna fecha válida en el archivo Fudo.")
+            st.error("❌ No se encontró fecha válida en archivo Fudo.")
             st.stop()
 
         fecha_detectada = df_fudo["Fecha"].dropna().dt.date.mode()[0]
@@ -65,49 +73,42 @@ if fudo_file and klap_file:
         fudo_dia = df_fudo[df_fudo["Fecha"].dt.date == fecha_detectada].copy()
         klap_dia = df_klap[df_klap["Fecha"].dt.date == fecha_detectada].copy()
 
-        fudo_dia = fudo_dia[fudo_dia["Estado"].astype(str).str.strip().str.lower() == "cerrada"]
-        klap_dia = klap_dia[klap_dia["Estado"].astype(str).str.strip().str.lower().str.startswith("aproba")]
-
         if fudo_dia.empty:
-            fechas_disponibles = df_fudo[df_fudo["Estado"].astype(str).str.strip().str.lower() == "cerrada"]["Fecha"].dropna().dt.date.unique()
-            st.warning(f"⚠️ No se encontraron registros cerrados en Fudo para la fecha detectada.\nFechas con estado 'Cerrada': {list(fechas_disponibles)}")
-
+            st.warning("⚠️ No se encontraron registros cerrados en Fudo para la fecha detectada.")
         if klap_dia.empty:
-            fechas_klap = df_klap["Fecha"].dropna().dt.date.unique()
-            st.warning(f"⚠️ No se encontraron transacciones aprobadas en Klap para la fecha detectada.\nFechas con transacciones en Klap: {list(fechas_klap)}")
+            st.warning("⚠️ No se encontraron transacciones aprobadas en Klap para la fecha detectada.")
 
-        if fudo_dia.empty or klap_dia.empty:
-            st.stop()
-
+        # === NORMALIZAR MÉTODOS DE PAGO ===
         fudo_dia["Medio de Pago Normalizado"] = fudo_dia["Medio de Pago"].replace({
-            "Tarj. Dbito": "Tarjeta",
             "Tarj. Débito": "Tarjeta",
-            "Tarj. Crédito": "Tarjeta",
-            "Tarj. Crdito": "Tarjeta",
             "Tarj Débito": "Tarjeta",
             "Tarjeta Débito": "Tarjeta",
-            "Cta. Cte.": "Cuentas Abiertas",
-            "Cta Cte": "Cuentas Abiertas",
-            "Cta Corriente": "Cuentas Abiertas"
+            "Tarj. Crédito": "Tarjeta",
+            "Tarj. Crdito": "Tarjeta",
+            "Transferencia": "Transferencia",
+            "Cta Corriente": "Cuentas Abiertas",
+            "Cta. Corriente": "Cuentas Abiertas",
         }).fillna("No Asignado")
 
+        # === AGRUPACIÓN ===
         fudo_agg = fudo_dia.groupby("Medio de Pago Normalizado")["Total"].sum().reset_index()
-        fudo_pivot = fudo_agg.pivot_table(index=None, columns="Medio de Pago Normalizado", values="Total", aggfunc="sum").fillna(0)
+        pivot = fudo_agg.pivot_table(index=None, columns="Medio de Pago Normalizado", values="Total", aggfunc="sum").fillna(0)
+        for metodo in ["Efectivo", "Tarjeta", "Transferencia", "Cuentas Abiertas"]:
+            if metodo not in pivot.columns:
+                pivot[metodo] = 0
 
-        for col in ["Efectivo", "Tarjeta", "Transferencia", "Cuentas Abiertas"]:
-            if col not in fudo_pivot.columns:
-                fudo_pivot[col] = 0
-
-        cash = fudo_pivot["Efectivo"].values[0]
-        card = fudo_pivot["Tarjeta"].values[0]
-        voucher = fudo_pivot["Transferencia"].values[0]
-        abiertos = fudo_pivot["Cuentas Abiertas"].values[0]
+        # === TOTALES ===
+        cash = pivot["Efectivo"].values[0]
+        card = pivot["Tarjeta"].values[0]
+        voucher = pivot["Transferencia"].values[0]
+        abiertos = pivot["Cuentas Abiertas"].values[0]
         fudo_total = fudo_dia["Total"].sum()
         klap_total = klap_dia["Monto"].sum()
         suma_medios = cash + card + voucher + abiertos
 
+        # === RESUMEN ===
         st.subheader("🔎 Resumen Conciliación")
-        resumen_df = pd.DataFrame.from_dict({
+        resumen = pd.DataFrame({
             "Cash": [cash],
             "Card": [card],
             "Voucher": [voucher],
@@ -115,16 +116,15 @@ if fudo_file and klap_file:
             "Total Fudo": [fudo_total],
             "TX Klap": [klap_total]
         })
-        st.dataframe(resumen_df.style.format("$ {:,.0f}"))
+        st.dataframe(resumen.style.format("$ {:,.0f}"))
 
-        diferencia_total = fudo_total - suma_medios
-        diferencia_tarjeta = card - klap_total
-
-        if abs(diferencia_total) > 0:
-            st.error(f"❌ Diferencia entre Total Fudo y suma de medios de pago: ${diferencia_total:,.0f}")
-
-        if abs(diferencia_tarjeta) > 0:
-            st.warning(f"⚠️ Diferencia entre Tarjeta Fudo (${card:,.0f}) y Klap (${klap_total:,.0f}): ${diferencia_tarjeta:,.0f}")
+        # === ALERTAS ===
+        if abs(fudo_total - suma_medios) > 0:
+            dif = fudo_total - suma_medios
+            st.error(f"❌ Total Fudo: ${fudo_total:,.0f} | Medios: ${suma_medios:,.0f} → Diferencia: ${dif:,.0f}")
+        if abs(card - klap_total) > 0:
+            dif_card = card - klap_total
+            st.warning(f"⚠️ Tarjeta Fudo: ${card:,.0f} | TX Klap: ${klap_total:,.0f} → Diferencia: ${dif_card:,.0f}")
 
     except Exception as e:
         st.error(f"❌ Error al procesar archivos:\n{str(e)}")
