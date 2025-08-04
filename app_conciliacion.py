@@ -9,7 +9,7 @@ st.set_page_config(page_title="Conciliación Diario Fudo & Klap", layout="center
 st.markdown(
     """
     <div style="text-align: center;">
-        <img src="https://raw.githubusercontent.com/BadJoe-analyst/willow/main/logo.png" width="200"/>
+        <img src="https://raw.githubusercontent.com/BadJoe-analyst/willow/main/logo.jpeg" width="200"/>
         <h2 style="margin-top: 0;">Willow Café</h2>
     </div>
     """,
@@ -21,7 +21,7 @@ st.title("📊 Conciliación de Ventas: Fudo vs Klap")
 st.markdown("""
 ### 📌 Instrucciones:
 1. Sube los archivos exportados de Fudo y Klap en formato CSV.
-2. Eres una washita rica.
+2. El archivo de Fudo debe omitir manualmente las primeras 3 filas antes de exportar.
 3. Esta app detecta automáticamente la fecha contenida en el archivo de Fudo.
 """)
 
@@ -41,7 +41,16 @@ if fudo_file and klap_file:
         enc_fudo = detectar_encoding(fudo_file)
         enc_klap = detectar_encoding(klap_file)
 
-        df_fudo = pd.read_csv(fudo_file, sep=';', encoding=enc_fudo, skiprows=3, on_bad_lines='skip')
+        # Intentar cargar Fudo con separador ; primero
+        try:
+            df_fudo = pd.read_csv(fudo_file, sep=';', encoding=enc_fudo, skiprows=3, on_bad_lines='skip')
+            if len(df_fudo.columns) == 1:
+                raise ValueError("Separador incorrecto detectado")
+        except:
+            fudo_file.seek(0)
+            df_fudo = pd.read_csv(fudo_file, sep=',', encoding=enc_fudo, skiprows=3, on_bad_lines='skip')
+
+        # Klap fijo con ;
         df_klap = pd.read_csv(klap_file, sep=';', encoding=enc_klap, on_bad_lines='skip')
 
         # Procesar fechas y montos
