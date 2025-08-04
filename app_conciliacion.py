@@ -77,8 +77,8 @@ if fudo_file and klap_file:
             st.warning("⚠️ No hay transacciones aprobadas en Klap para esa fecha")
 
         # Función para categorizar cada Medio de Pago
-        def categoriza(medio):
-            m = str(medio).strip().lower()
+        def categoriza(m):
+            m = str(m).strip().lower()
             if "efectivo" in m:
                 return "Efectivo"
             if "tarj" in m:
@@ -90,7 +90,7 @@ if fudo_file and klap_file:
             if "transf" in m:
                 return "Transferencia"
             if "abierta" in m:
-                return "Cuentas Abiertas"
+                return "En curso"
             return "Otro"
 
         # Aplicar categorización
@@ -103,11 +103,11 @@ if fudo_file and klap_file:
         voucher       = agg.get("Voucher", 0)
         cta_cte       = agg.get("Cta. Cte.", 0)
         transferencia = agg.get("Transferencia", 0)
-        abiertas      = agg.get("Cuentas Abiertas", 0)
+        en_curso      = agg.get("En curso", 0)
 
         total_fudo = fudo_dia["Total"].sum()
         total_klap = klap_dia["Monto"].sum()
-        suma_medios = efectivo + tarjeta + voucher + cta_cte + transferencia + abiertas
+        suma_medios = efectivo + tarjeta + voucher + cta_cte + transferencia + en_curso
 
         # Mostrar resumen final
         st.subheader("🔎 Resumen Conciliación")
@@ -117,7 +117,7 @@ if fudo_file and klap_file:
             "Voucher": voucher,
             "Cta. Cte.": cta_cte,
             "Transferencia": transferencia,
-            "Cuentas Abiertas": abiertas,
+            "En curso": en_curso,
             "Total Fudo": total_fudo,
             "TX Klap": total_klap
         }])
