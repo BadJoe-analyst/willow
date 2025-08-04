@@ -41,17 +41,20 @@ if fudo_file and klap_file:
         enc_fudo = detectar_encoding(fudo_file)
         enc_klap = detectar_encoding(klap_file)
 
-        # Intentar cargar Fudo con separador ; primero
+        # Intentar cargar Fudo con ; primero, luego ,
         try:
             df_fudo = pd.read_csv(fudo_file, sep=';', encoding=enc_fudo, skiprows=3, on_bad_lines='skip')
             if len(df_fudo.columns) == 1:
-                raise ValueError("Separador incorrecto detectado")
+                raise ValueError("Separador incorrecto")
         except:
             fudo_file.seek(0)
             df_fudo = pd.read_csv(fudo_file, sep=',', encoding=enc_fudo, skiprows=3, on_bad_lines='skip')
 
-        # Klap fijo con ;
+        # Leer Klap
         df_klap = pd.read_csv(klap_file, sep=';', encoding=enc_klap, on_bad_lines='skip')
+
+        # 🔍 Filtrar transacciones aprobadas en Klap
+        df_klap = df_klap[df_klap["Estado"].str.lower() == "aprobado"]
 
         # Procesar fechas y montos
         df_fudo["Fecha"] = pd.to_datetime(df_fudo["Fecha"], dayfirst=True, errors='coerce')
@@ -67,7 +70,7 @@ if fudo_file and klap_file:
         fecha_detectada = df_fudo["Fecha"].dropna().dt.date.mode()[0]
         st.success(f"📅 Fecha detectada: {fecha_detectada.strftime('%d-%m-%Y')}")
 
-        # Filtrar por fecha
+        # Filtrar ambos archivos por fecha
         fudo_dia = df_fudo[df_fudo["Fecha"].dt.date == fecha_detectada].copy()
         klap_dia = df_klap[df_klap["Fecha"].dt.date == fecha_detectada].copy()
 
@@ -76,7 +79,7 @@ if fudo_file and klap_file:
         if klap_dia.empty:
             st.warning("⚠️ No se encontraron registros en Klap para la fecha detectada.")
 
-        # Normalizar métodos de pago
+        # Normalizar medios de pago
         fudo_dia["Medio de Pago Normalizado"] = fudo_dia["Medio de Pago"].replace({
             "Tarj. Dbito": "Tarjeta",
             "Tarj. Débito": "Tarjeta",
@@ -86,7 +89,7 @@ if fudo_file and klap_file:
             "Tarjeta Débito": "Tarjeta"
         }).fillna("No Asignado")
 
-        # Agrupar
+        # Agrupar Fudo por medios de pago
         fudo_agg = fudo_dia.groupby("Medio de Pago Normalizado")["Total"].sum().reset_index()
         fudo_pivot = fudo_agg.pivot_table(index=None, columns="Medio de Pago Normalizado", values="Total", aggfunc="sum").fillna(0)
 
@@ -103,7 +106,7 @@ if fudo_file and klap_file:
         klap_total = klap_dia["Monto"].sum()
         suma_medios = cash + card + voucher + abiertos
 
-        # Mostrar tabla
+        # Mostrar resumen
         st.subheader("🔎 Resumen Conciliación")
         resumen_df = pd.DataFrame.from_dict({
             "Cash": [cash],
@@ -117,10 +120,10 @@ if fudo_file and klap_file:
 
         # Alertas
         if abs(fudo_total - suma_medios) > 0:
-            st.error(f"⚠️ Total Fudo: ${fudo_total:,.0f}\nSuma de medios de pago: ${suma_medios:,.0f}\n→ ❌ Hay una diferencia entre el total y los medios de pago.")
+            st.error(f"⚠️ Total Fudo: ${fudo_total:,.0f}\n\nSuma de medios de pago: ${suma_medios:,.0f}\n\n→ ❌ Hay una diferencia entre el total y los medios de pago.")
 
         if abs(card - klap_total) > 0:
-            st.warning(f"⚠️ Tarjeta Fudo: ${card:,.0f}\nTX Klap: ${klap_total:,.0f}\n→ ⚠️ Hay una diferencia entre el monto en tarjeta Fudo y Klap.")
+            st.warning(f"⚠️ Tarjeta Fudo: ${card:,.0f}\n\nTX Klap: ${klap_total:,.0f}\n\n→ ⚠️ Hay una diferencia entre el monto en tarjeta Fudo y Klap.")
 
     except Exception as e:
-        st.error(f"❌ Error al procesar archivos:\n{str(e)}")
+        st.error(f"❌ Error al procesar archivos:\n\n{str(e)}")
