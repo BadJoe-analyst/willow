@@ -54,7 +54,7 @@ if fudo_file and klap_file:
         df_klap = pd.read_csv(klap_file, sep=';', encoding=enc_klap, on_bad_lines='skip')
 
         # 🔍 Filtrar transacciones aprobadas en Klap
-        df_klap = df_klap[df_klap["Estado"].str.lower() == "aprobada"]
+        df_klap[df_klap["Estado"].str.lower().str.contains("aprobad")]
 
         # Procesar fechas y montos
         df_fudo["Fecha"] = pd.to_datetime(df_fudo["Fecha"], dayfirst=True, errors='coerce')
@@ -130,4 +130,5 @@ if fudo_file and klap_file:
 
     except Exception as e:
         st.error(f"❌ Error al procesar archivos:\n\n{str(e)}")
+
 
