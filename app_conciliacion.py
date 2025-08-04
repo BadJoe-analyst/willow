@@ -41,7 +41,7 @@ if fudo_file and klap_file:
         enc_fudo = detectar_encoding(fudo_file)
         enc_klap = detectar_encoding(klap_file)
 
-        # Intentar cargar Fudo con ; primero, luego ,
+        # Intentar cargar Fudo
         try:
             df_fudo = pd.read_csv(fudo_file, sep=';', encoding=enc_fudo, skiprows=3, on_bad_lines='skip')
             if len(df_fudo.columns) == 1:
@@ -53,8 +53,8 @@ if fudo_file and klap_file:
         # Leer Klap
         df_klap = pd.read_csv(klap_file, sep=';', encoding=enc_klap, on_bad_lines='skip')
 
-        # 🔍 Filtrar transacciones aprobadas en Klap
-        df_klap[df_klap["Estado"].str.lower().str.contains("aprobad")]
+        # 🔍 Filtrar transacciones aprobadas (masculino/femenino)
+        df_klap = df_klap[df_klap["Estado"].str.lower().str.contains("aprobad", na=False)]
 
         # Procesar fechas y montos
         df_fudo["Fecha"] = pd.to_datetime(df_fudo["Fecha"], dayfirst=True, errors='coerce')
@@ -130,5 +130,3 @@ if fudo_file and klap_file:
 
     except Exception as e:
         st.error(f"❌ Error al procesar archivos:\n\n{str(e)}")
-
-
