@@ -111,10 +111,10 @@ if fudo_file and klap_file:
         # Mostrar resumen
         st.subheader("🔎 Resumen Conciliación")
         resumen_df = pd.DataFrame({
-            "Cash": cash,
-            "Card": card,
-            "Voucher": voucher,
-            "Fudo Pagos": abiertos,
+            "Cash": [cash.values[0]],
+            "Card": [card.values[0]],
+            "Voucher": [voucher.values[0]],
+            "Fudo Pagos": [abiertos.values[0]],
             "Total Fudo": [fudo_total],
             "TX Klap": [klap_total]
         })
