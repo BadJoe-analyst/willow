@@ -32,7 +32,7 @@ def detectar_encoding(f):
 
 if fudo_file and klap_file:
     try:
-        # Leer Fudo (sep ; o ,)
+        # Leer Fudo (intenta ';' y luego ',')
         enc_f = detectar_encoding(fudo_file)
         try:
             df_f = pd.read_csv(fudo_file, sep=";", encoding=enc_f, skiprows=3, on_bad_lines="skip")
@@ -62,7 +62,8 @@ if fudo_file and klap_file:
 
         # Detectar la fecha dominante en Fudo
         if df_f["Fecha"].dropna().empty:
-            st.error("❌ No se detectó fecha válida en Fudo."); st.stop()
+            st.error("❌ No se detectó fecha válida en Fudo.")
+            st.stop()
         fecha = df_f["Fecha"].dt.date.mode()[0]
         st.success(f"📅 Fecha detectada: {fecha.strftime('%d-%m-%Y')}")
 
@@ -76,16 +77,18 @@ if fudo_file and klap_file:
             st.warning("⚠️ No hay transacciones aprobadas en Klap para esa fecha")
 
         # Función para categorizar cada Medio de Pago
-        def categoriza(m):
-            m = str(m).strip().lower()
+        def categoriza(medio):
+            m = str(medio).strip().lower()
             if "efectivo" in m:
                 return "Efectivo"
             if "tarj" in m:
                 return "Tarjeta"
             if "voucher" in m:
                 return "Voucher"
-            if "cta" in m and "corr" in m:
-                return "Cta Corriente"
+            if m == "cta. cte." or "cta cte" in m:
+                return "Cta. Cte."
+            if "transf" in m:
+                return "Transferencia"
             if "abierta" in m:
                 return "Cuentas Abiertas"
             return "Otro"
@@ -98,12 +101,13 @@ if fudo_file and klap_file:
         efectivo      = agg.get("Efectivo", 0)
         tarjeta       = agg.get("Tarjeta", 0)
         voucher       = agg.get("Voucher", 0)
-        cta_corriente = agg.get("Cta Corriente", 0)
-        cuentas_abiertas = agg.get("Cuentas Abiertas", 0)
+        cta_cte       = agg.get("Cta. Cte.", 0)
+        transferencia = agg.get("Transferencia", 0)
+        abiertas      = agg.get("Cuentas Abiertas", 0)
 
         total_fudo = fudo_dia["Total"].sum()
         total_klap = klap_dia["Monto"].sum()
-        suma_medios = efectivo + tarjeta + voucher + cta_corriente + cuentas_abiertas
+        suma_medios = efectivo + tarjeta + voucher + cta_cte + transferencia + abiertas
 
         # Mostrar resumen final
         st.subheader("🔎 Resumen Conciliación")
@@ -111,8 +115,9 @@ if fudo_file and klap_file:
             "Cash": efectivo,
             "Card": tarjeta,
             "Voucher": voucher,
-            "Cta Corriente": cta_corriente,
-            "Cuentas Abiertas": cuentas_abiertas,
+            "Cta. Cte.": cta_cte,
+            "Transferencia": transferencia,
+            "Cuentas Abiertas": abiertas,
             "Total Fudo": total_fudo,
             "TX Klap": total_klap
         }])
