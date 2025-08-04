@@ -86,7 +86,9 @@ if fudo_file and klap_file:
             "Tarj. Crédito": "Tarjeta",
             "Tarj. Crdito": "Tarjeta",
             "Tarj Débito": "Tarjeta",
-            "Tarjeta Débito": "Tarjeta"
+            "Tarjeta Débito": "Tarjeta",
+            "Voucher": "Transferencia",
+            "Cta. Cte.": "Cuentas Abiertas"
         }).fillna("No Asignado")
 
         # Agrupar Fudo por medios de pago
@@ -98,32 +100,33 @@ if fudo_file and klap_file:
                 fudo_pivot[col] = 0
 
         # Totales
-        cash = fudo_pivot["Efectivo"].values[0]
-        card = fudo_pivot["Tarjeta"].values[0]
-        voucher = fudo_pivot["Transferencia"].values[0]
-        abiertos = fudo_pivot["Cuentas Abiertas"].values[0]
+        cash = fudo_pivot["Efectivo"]
+        card = fudo_pivot["Tarjeta"]
+        voucher = fudo_pivot["Transferencia"]
+        abiertos = fudo_pivot["Cuentas Abiertas"]
         fudo_total = fudo_dia["Total"].sum()
         klap_total = klap_dia["Monto"].sum()
         suma_medios = cash + card + voucher + abiertos
 
         # Mostrar resumen
         st.subheader("🔎 Resumen Conciliación")
-        resumen_df = pd.DataFrame.from_dict({
-            "Cash": [cash],
-            "Card": [card],
-            "Voucher": [voucher],
-            "Fudo Pagos": [abiertos],
+        resumen_df = pd.DataFrame({
+            "Cash": cash,
+            "Card": card,
+            "Voucher": voucher,
+            "Fudo Pagos": abiertos,
             "Total Fudo": [fudo_total],
             "TX Klap": [klap_total]
         })
-        st.dataframe(resumen_df.style.format("$ {:,.0f}"))
+
+        st.dataframe(resumen_df.fillna(0).style.format("$ {:,.0f}"))
 
         # Alertas
-        if abs(fudo_total - suma_medios) > 0:
-            st.error(f"⚠️ Total Fudo: ${fudo_total:,.0f}\n\nSuma de medios de pago: ${suma_medios:,.0f}\n\n→ ❌ Hay una diferencia entre el total y los medios de pago.")
+        if abs(fudo_total - suma_medios.values[0]) > 0:
+            st.error(f"⚠️ Total Fudo: ${fudo_total:,.0f}\n\nSuma de medios de pago: ${suma_medios.values[0]:,.0f}\n\n→ ❌ Hay una diferencia entre el total y los medios de pago.")
 
-        if abs(card - klap_total) > 0:
-            st.warning(f"⚠️ Tarjeta Fudo: ${card:,.0f}\n\nTX Klap: ${klap_total:,.0f}\n\n→ ⚠️ Hay una diferencia entre el monto en tarjeta Fudo y Klap.")
+        if abs(card.values[0] - klap_total) > 0:
+            st.warning(f"⚠️ Tarjeta Fudo: ${card.values[0]:,.0f}\n\nTX Klap: ${klap_total:,.0f}\n\n→ ⚠️ Hay una diferencia entre el monto en tarjeta Fudo y Klap.")
 
     except Exception as e:
         st.error(f"❌ Error al procesar archivos:\n\n{str(e)}")
