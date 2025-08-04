@@ -5,7 +5,7 @@ import chardet
 
 st.set_page_config(page_title="Conciliación Diario Fudo & Klap", layout="centered")
 
-# === LOGO + TÍTULO ===
+# --- LOGO y TÍTULO ---
 st.markdown("""
 <div style="text-align: center;">
   <img src="https://raw.githubusercontent.com/BadJoe-analyst/willow/main/logo.jpeg" width="200"/>
@@ -21,7 +21,7 @@ st.markdown("""
 3. La app detecta la fecha automáticamente.
 """)
 
-st.subheader("⬆️ Subida de archivos")
+# --- Subida de archivos ---
 fudo_file = st.file_uploader("Archivo Fudo (.csv)", type="csv", key="fudo")
 klap_file = st.file_uploader("Archivo Klap (.csv)", type="csv", key="klap")
 
@@ -32,92 +32,99 @@ def detectar_encoding(f):
 
 if fudo_file and klap_file:
     try:
-        # detectar encodings
+        # Leer Fudo (sep ; o ,)
         enc_f = detectar_encoding(fudo_file)
-        enc_k = detectar_encoding(klap_file)
-
-        # cargar Fudo (sep ; o ,)
         try:
             df_f = pd.read_csv(fudo_file, sep=";", encoding=enc_f, skiprows=3, on_bad_lines="skip")
-            if len(df_f.columns)==1: raise
+            if len(df_f.columns) == 1:
+                raise ValueError
         except:
             fudo_file.seek(0)
             df_f = pd.read_csv(fudo_file, sep=",", encoding=enc_f, skiprows=3, on_bad_lines="skip")
 
-        # cargar Klap
+        # Leer Klap
+        enc_k = detectar_encoding(klap_file)
         df_k = pd.read_csv(klap_file, sep=";", encoding=enc_k, on_bad_lines="skip")
 
-        # parsear fechas y montos
+        # Formatear fechas y montos
         df_f["Fecha"] = pd.to_datetime(df_f["Fecha"], dayfirst=True, errors="coerce")
         df_f["Total"] = pd.to_numeric(df_f["Total"], errors="coerce").fillna(0)
         df_k["Fecha"] = pd.to_datetime(df_k["Fecha"], dayfirst=True, errors="coerce")
         df_k["Monto"] = pd.to_numeric(df_k["Monto"], errors="coerce").fillna(0)
 
-        # filtrar Klap aprobado/aprobada
+        # Filtrar solo ventas cerradas en Fudo
+        df_f["Estado"] = df_f["Estado"].astype(str).str.strip().str.lower()
+        df_f = df_f[df_f["Estado"] == "cerrada"]
+
+        # Filtrar solo transacciones aprobadas en Klap
         df_k["Estado"] = df_k["Estado"].astype(str).str.strip().str.lower()
         df_k = df_k[df_k["Estado"].str.contains("aproba")]
 
-        # filtrar Fudo cerrada
-        df_f["Estado"] = df_f["Estado"].astype(str).str.strip().str.lower()
-        df_f = df_f[df_f["Estado"]=="cerrada"]
-
-        # asegurarnos hay fecha
+        # Detectar la fecha dominante en Fudo
         if df_f["Fecha"].dropna().empty:
-            st.error("❌ No se encontró fecha válida en Fudo."); st.stop()
+            st.error("❌ No se detectó fecha válida en Fudo."); st.stop()
         fecha = df_f["Fecha"].dt.date.mode()[0]
-        st.success(f"📅 Fecha: {fecha.strftime('%d-%m-%Y')}")
+        st.success(f"📅 Fecha detectada: {fecha.strftime('%d-%m-%Y')}")
 
-        # filtrar ambos por fecha
-        fudo_dia = df_f[df_f["Fecha"].dt.date==fecha].copy()
-        klap_dia= df_k[df_k["Fecha"].dt.date==fecha].copy()
+        # Filtrar ambos por esa fecha
+        fudo_dia = df_f[df_f["Fecha"].dt.date == fecha].copy()
+        klap_dia = df_k[df_k["Fecha"].dt.date == fecha].copy()
 
         if fudo_dia.empty:
             st.warning("⚠️ No hay ventas cerradas en Fudo para esa fecha")
         if klap_dia.empty:
             st.warning("⚠️ No hay transacciones aprobadas en Klap para esa fecha")
 
-        # función de normalización por palabras clave
+        # Función para categorizar cada Medio de Pago
         def categoriza(m):
             m = str(m).strip().lower()
             if "efectivo" in m:
                 return "Efectivo"
             if "tarj" in m:
                 return "Tarjeta"
-            if "vouch" in m or "transf" in m:
-                return "Transferencia"
-            if "cta" in m or "corrient" in m or "cxc" in m:
+            if "voucher" in m:
+                return "Voucher"
+            if "cta" in m and "corr" in m:
+                return "Cta Corriente"
+            if "abierta" in m:
                 return "Cuentas Abiertas"
             return "Otro"
 
+        # Aplicar categorización
         fudo_dia["Método"] = fudo_dia["Medio de Pago"].apply(categoriza)
 
-        # agrupar
+        # Sumar totales por categoría
         agg = fudo_dia.groupby("Método")["Total"].sum()
-        cash = agg.get("Efectivo", 0)
-        card = agg.get("Tarjeta", 0)
-        voucher= agg.get("Transferencia", 0)
-        cta   = agg.get("Cuentas Abiertas", 0)
+        efectivo      = agg.get("Efectivo", 0)
+        tarjeta       = agg.get("Tarjeta", 0)
+        voucher       = agg.get("Voucher", 0)
+        cta_corriente = agg.get("Cta Corriente", 0)
+        cuentas_abiertas = agg.get("Cuentas Abiertas", 0)
+
         total_fudo = fudo_dia["Total"].sum()
         total_klap = klap_dia["Monto"].sum()
-        suma_medios = cash+card+voucher+cta
+        suma_medios = efectivo + tarjeta + voucher + cta_corriente + cuentas_abiertas
 
-        # mostrar
+        # Mostrar resumen final
+        st.subheader("🔎 Resumen Conciliación")
         df_res = pd.DataFrame([{
-            "Cash": cash,
-            "Card": card,
+            "Cash": efectivo,
+            "Card": tarjeta,
             "Voucher": voucher,
-            "Fudo Pagos": cta,
+            "Cta Corriente": cta_corriente,
+            "Cuentas Abiertas": cuentas_abiertas,
             "Total Fudo": total_fudo,
             "TX Klap": total_klap
         }])
-        st.subheader("🔎 Resumen Conciliación")
         st.dataframe(df_res.style.format("$ {:,.0f}"))
 
-        # alertas
-        if total_fudo!=suma_medios:
-            st.error(f"❌ Fudo total ${total_fudo:,.0f} ≠ suma medios ${suma_medios:,.0f} → Δ ${total_fudo-suma_medios:,.0f}")
-        if card!=total_klap:
-            st.warning(f"⚠️ Fudo tarjeta ${card:,.0f} ≠ Klap ${total_klap:,.0f} → Δ ${card-total_klap:,.0f}")
+        # Alertas de diferencias
+        if abs(total_fudo - suma_medios) > 0:
+            diff = total_fudo - suma_medios
+            st.error(f"❌ Total Fudo (${total_fudo:,.0f}) ≠ suma medios (${suma_medios:,.0f}) → Δ ${diff:,.0f}")
+        if abs(tarjeta - total_klap) > 0:
+            diff_card = tarjeta - total_klap
+            st.warning(f"⚠️ Tarjeta Fudo (${tarjeta:,.0f}) ≠ Klap (${total_klap:,.0f}) → Δ ${diff_card:,.0f}")
 
     except Exception as e:
-        st.error(f"❌ Error: {e}")
+        st.error(f"❌ Error al procesar archivos:\n{e}")
